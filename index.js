@@ -29,12 +29,32 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
+    const classCollection = client.db("summerCamp").collection("classes");
+    const selectedClassCollection = client.db("summerCamp").collection("selectedClasses");
 
 
+    // classes
+    app.get('/classes', async(req,res)=>{
+      const result = await classCollection.find().toArray();
+      res.send(result)
+    })
 
-
-
-
+    // selected class
+    app.get('/selectedClasses', async(req,res)=>{
+      const email = req.query.email;
+      if(!email){
+        res.send([])
+      }
+      const query = {email: email}
+      const result = await selectedClassCollection.find(query).toArray()
+      res.send(result)
+    })
+    app.post('/selectedClasses', async(req,res)=>{
+      const course = req.body;
+      console.log(course)
+      const result = await selectedClassCollection.insertOne(course);
+      res.send(result)
+    })
 
 
 
