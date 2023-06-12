@@ -99,6 +99,21 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/classes/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { "instructorEmail": email };
+      const result = await classCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    app.post("/classes", async (req, res) => {
+      const body = req.body;
+      body.price = parseFloat(body.price);
+      // console.log(body)
+      const result = await classCollection.insertOne(body);
+      res.send(result);
+    });
+
     // selected class
     app.get("/selectedClasses", async (req, res) => {
       const email = req.query.email;
