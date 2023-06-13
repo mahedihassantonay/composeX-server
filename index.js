@@ -4,6 +4,7 @@ const cors = require("cors");
 require("dotenv").config();
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY);
 
 const port = process.env.PORT || 5000;
 
@@ -31,7 +32,20 @@ async function run() {
     const selectedClassCollection = client
       .db("summerCamp")
       .collection("selectedClasses");
+    const paymentCollection = client.db("summerCamp").collection("payment");
+
     const usersCollection = client.db("summerCamp").collection("users");
+
+    // Enrolled classes
+    app.get("/enrolledClasses/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const enrolledClasses = await paymentCollection
+        .find(query)
+        .sort({ date: -1 })
+        .toArray();
+      res.send(enrolledClasses);
+    });
 
     // users
     app.get("/users", async (req, res) => {
@@ -101,7 +115,7 @@ async function run() {
 
     app.get("/classes/:email", async (req, res) => {
       const email = req.params.email;
-      const query = { "instructorEmail": email };
+      const query = { instructorEmail: email };
       const result = await classCollection.find(query).toArray();
       res.send(result);
     });
@@ -127,6 +141,13 @@ async function run() {
     app.post("/selectedClasses", async (req, res) => {
       const course = req.body;
       console.log(course);
+
+      const filter = { _id: new ObjectId(course.classId) };
+      const update = { $inc: { availableSeats: -1 } };
+    
+      const updateResult = await classCollection.updateOne(filter, update);
+      console.log("Seats deducted:", updateResult.modifiedCount);
+      
       const result = await selectedClassCollection.insertOne(course);
       res.send(result);
     });
@@ -136,6 +157,35 @@ async function run() {
       const query = { _id: new ObjectId(id) };
       const result = await selectedClassCollection.deleteOne(query);
       res.send(result);
+    });
+
+    // create payment intent
+    app.post("/create-payment-intent", async (req, res) => {
+      const { price } = req.body;
+
+      const amount = parseInt(price * 100);
+      console.log(amount, price);
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
+    // payment related api
+    app.post("/payments", async (req, res) => {
+      const payment = req.body;
+      const insertResult = await paymentCollection.insertOne(payment);
+
+      const query = {
+        _id: { $in: payment.courseItems.map((id) => new ObjectId(id)) },
+      };
+      const deleteResult = await selectedClassCollection.deleteMany(query);
+
+      res.send({ insertResult, deleteResult });
     });
 
     // Send a ping to confirm a successful connection
