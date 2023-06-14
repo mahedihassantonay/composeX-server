@@ -25,9 +25,12 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
-
+    client.connect((error)=>{
+     if(error){
+       console.log(error)
+       return;
+     }
+    });
     const classCollection = client.db("summerCamp").collection("classes");
     const selectedClassCollection = client
       .db("summerCamp")
@@ -115,7 +118,7 @@ async function run() {
 
     app.get("/classes/:email", async (req, res) => {
       const email = req.params.email;
-      const query = { instructorEmail: email };
+      const query = { email: email };
       const result = await classCollection.find(query).toArray();
       res.send(result);
     });
@@ -144,10 +147,10 @@ async function run() {
 
       const filter = { _id: new ObjectId(course.classId) };
       const update = { $inc: { availableSeats: -1 } };
-    
+
       const updateResult = await classCollection.updateOne(filter, update);
       console.log("Seats deducted:", updateResult.modifiedCount);
-      
+
       const result = await selectedClassCollection.insertOne(course);
       res.send(result);
     });
